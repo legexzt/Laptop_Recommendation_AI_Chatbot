@@ -33,16 +33,16 @@ st.markdown(f"""
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Inter:wght@400;500;600;700&display=swap');
 
     .stApp {{
-        background-image: linear-gradient(rgba(15, 23, 42, 0.88), rgba(15, 23, 42, 0.88)), url("data:image/png;base64,{bg_base64}");
+        background-image: linear-gradient(rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.92)), url("data:image/png;base64,{bg_base64}");
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
         font-family: 'Inter', sans-serif;
     }}
     .main-panel {{
-        background: rgba(30, 41, 59, 0.78);
-        backdrop-filter: blur(18px);
-        -webkit-backdrop-filter: blur(18px);
+        background: rgba(30, 41, 59, 0.85);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
         border-radius: 20px;
         padding: 34px;
         border: 1px solid rgba(255, 255, 255, 0.16);
@@ -73,13 +73,17 @@ st.markdown(f"""
         color: #93C5FD !important;
         margin-bottom: 22px;
     }}
+    
+    /* Overall Text Styling */
     [data-testid="stMain"] p, [data-testid="stMain"] h1, [data-testid="stMain"] h2,
     [data-testid="stMain"] h3, [data-testid="stMain"] h4, [data-testid="stMain"] h5,
     [data-testid="stMain"] h6, [data-testid="stMain"] span, [data-testid="stMain"] label,
     [data-testid="stMain"] li, [data-testid="stMain"] div[data-testid="stMarkdownContainer"] *,
     .stMainBlockContainer *, section.stMain * {{
-        color: #FFFFFF !important;
+        color: #F8FAFC !important;
     }}
+
+    /* High Contrast Input Controls (Fixes Blackout Text) */
     input, textarea, select,
     [data-testid="stNumberInput"] input,
     [data-testid="stSelectbox"] select,
@@ -87,13 +91,36 @@ st.markdown(f"""
     [data-baseweb="input"] input,
     [data-baseweb="textarea"] textarea,
     .stTextInput input, .stNumberInput input, .stTextArea textarea,
-    div[data-baseweb="select"] div {{ color: #0F172A !important; }}
+    div[data-baseweb="select"] div,
+    [data-baseweb="popover"] *,
+    div[role="listbox"] * {{
+        color: #F8FAFC !important;
+        background-color: #1E293B !important;
+        border-color: rgba(255, 255, 255, 0.2) !important;
+    }}
+    
+    input::placeholder, textarea::placeholder {{
+        color: #94A3B8 !important;
+        opacity: 1 !important;
+    }}
+
+    /* Sidebar Contrast Fixes */
+    [data-testid="stSidebar"] *, 
+    [data-testid="stSidebar"] p, 
+    [data-testid="stSidebar"] label,
+    [data-testid="stSidebar"] span,
+    [data-testid="stSidebar"] div,
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3 {{
+        color: #F8FAFC !important;
+    }}
     
     .response-card {{
-        background: rgba(15, 23, 42, 0.75);
+        background: rgba(15, 23, 42, 0.85);
         border-radius: 16px;
         padding: 26px;
-        border: 1px solid rgba(96, 165, 250, 0.25);
+        border: 1px solid rgba(96, 165, 250, 0.3);
         margin-top: 15px;
         box-shadow: 0 8px 24px -2px rgba(0, 0, 0, 0.35);
         animation: slideUp 0.4s ease-out;
@@ -110,7 +137,19 @@ st.markdown('<div class="main-panel">', unsafe_allow_html=True)
 st.markdown('<div class="title-text">💻 Laptop Recommendation AI Advisor</div>', unsafe_allow_html=True)
 st.markdown('<div class="subtitle-badge">Conversational AI · Groq Llama-3 / Hardware Intelligence | Mohd Jibraan</div>', unsafe_allow_html=True)
 
-api_key = os.getenv("GROQ_API_KEY", "")
+# Resolve API key from secrets, .env, or session state
+default_api_key = ""
+try:
+    if "GROQ_API_KEY" in st.secrets and st.secrets["GROQ_API_KEY"]:
+        default_api_key = st.secrets["GROQ_API_KEY"]
+except Exception:
+    pass
+
+if not default_api_key:
+    default_api_key = os.getenv("GROQ_API_KEY", "")
+
+if "user_api_key" not in st.session_state:
+    st.session_state.user_api_key = default_api_key
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
@@ -169,7 +208,7 @@ with tab_chat:
         st.markdown("### 💡 Recommended Laptops & Analysis")
 
         if submit_btn and user_query.strip():
-            actual_key = api_key
+            actual_key = st.session_state.user_api_key or default_api_key
             response_text = ""
             
             if actual_key:
@@ -198,7 +237,8 @@ with tab_chat:
                                     f"2. **Battery & Portability Pick**: Apple MacBook Air (M2/M3) or Asus Zenbook 14.\n\n" \
                                     f"### ⚖️ Checklist\n" \
                                     f"- **RAM:** Minimum 16GB for smooth multitasking.\n" \
-                                    f"- **Display:** IPS Anti-glare panel with 300+ nits brightness."
+                                    f"- **Display:** IPS Anti-glare panel with 300+ nits brightness.\n\n" \
+                                    f"*(Note: LLM Query Error: {str(e)})*"
             else:
                 response_text = f"### 💻 AI Recommendations for {primary_use}\n\n" \
                                 f"**Target Budget:** {budget_category} | **OS:** {preferred_os}\n\n" \
@@ -231,11 +271,13 @@ with tab_guide:
     st.table(df_specs)
 
 with tab_settings:
-    st.markdown("### ⚙️ Environment & API Configuration")
-    user_api = st.text_input("Groq API Key Override", value=api_key, type="password")
-    if user_api:
-        st.success("API Key is loaded and ready for LLM queries!")
+    st.markdown("### ⚙️ Environment & API Key Configuration")
+    st.write("For Streamlit Cloud deployments, configure `GROQ_API_KEY` in **App Settings ➔ Secrets**.")
+    input_key = st.text_input("Groq API Key (Override)", value=st.session_state.user_api_key, type="password")
+    if input_key:
+        st.session_state.user_api_key = input_key
+        st.success("API Key is saved for this session!")
     else:
-        st.info("Operating in intelligent fallback mode.")
+        st.info("Operating in intelligent recommendation fallback mode.")
 
 st.markdown('</div>', unsafe_allow_html=True)
